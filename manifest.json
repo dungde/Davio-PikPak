@@ -1,0 +1,30 @@
+{
+  "id": "com.nuvio.pikpak.webdav",
+  "name": "PikPak WebDAV Provider",
+  "version": "1.0.0",
+  "description": "Provider kết nối thư viện PikPak qua WebDAV cho Nuvio",
+  "icon": "https://raw.githubusercontent.com/dungde/Davio-PikPak/main/icon.png",
+  "main": "index.js",
+  "supportedTypes": ["movie", "tv"],
+  "resources": ["stream"],
+  "settings": [
+    {
+      "key": "webdav_url",
+      "type": "text",
+      "label": "WebDAV URL",
+      "default": "http://127.0.0.1:8080/dav"
+    },
+    {
+      "key": "username",
+      "type": "text",
+      "label": "PikPak Email / Phone",
+      "default": ""
+    },
+    {
+      "key": "password",
+      "type": "password",
+      "label": "PikPak Password",
+      "default": ""
+    }
+  ]
+}
