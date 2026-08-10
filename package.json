@@ -1,0 +1,13 @@
+{
+  "name": "nuvio-pikpak-provider",
+  "version": "1.0.0",
+  "description": "Nuvio PikPak WebDAV Provider",
+  "main": "index.js",
+  "scripts": {
+    "start": "npx http-server . --cors -p 3000"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}
