@@ -69,17 +69,12 @@ async function fetchWebDAVFiles(baseUrl, username, password, path = "/") {
  * Hàm lấy Stream dành riêng cho Nuvio Framework
  */
 async function getStreams(args) {
-  const { config, type, id } = args;
+  const { type, id } = args;
 
-  // Lấy cấu hình do người dùng nhập hoặc cấu hình mặc định
-  const webdavUrl = config?.webdav_url || "http://127.0.0.1:8080/dav";
-  const username = config?.username || "";
-  const password = config?.password || "";
-
-  if (!username || !password) {
-    console.warn("[PikPak WebDAV] Thiếu tài khoản hoặc mật khẩu.");
-    return { streams: [] };
-  }
+  // ĐIỀN THÔNG TIN TÀI KHOẢN CỦA BẠN TRỰC TIẾP TẠI ĐÂY:
+  const webdavUrl = "http://127.0.0.1:3000/dav"; // Hoặc IP local chạy pikpak-webdav bridge
+  const username = " rioh6986@gmail.com"; 
+  const password = " Rio@1234567";
 
   console.log(`[PikPak WebDAV] Đang tìm kiếm media cho ID: ${id}, Type: ${type}`);
   
@@ -89,7 +84,3 @@ async function getStreams(args) {
     streams: streams
   };
 }
-
-module.exports = {
-  getStreams
-};
