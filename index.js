@@ -8,19 +8,41 @@ const https = require("https");
 const PIKPAK_CONFIG = {
   baseUrl: "https://dav.mypikpak.com",
 
-  // Nhập tài khoản PikPak hiện tại của bạn
+  // ==========================================================
+  // NHẬP TÀI KHOẢN PIKPAK CỦA BẠN TẠI ĐÂY
+  // ==========================================================
+
   username: "nbmu",
-  password: "agwtnmaq"
+  password: " agwtnmaq"
 };
 
 // ============================================================
-// SERVER
+// RENDER PORT
 // ============================================================
 
 const PORT = process.env.PORT || 10000;
 
 // ============================================================
-// BASIC AUTH
+// WEBDAV XML
+// ============================================================
+
+const PROPFIND_XML = `<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:">
+  <d:prop>
+    <d:displayname/>
+    <d:resourcetype/>
+  </d:prop>
+</d:propfind>`;
+
+// ============================================================
+// CACHE
+// ============================================================
+
+let FILE_CACHE = [];
+let isScanning = false;
+
+// ============================================================
+// AUTH
 // ============================================================
 
 function getAuthHeader(username, password) {
@@ -34,21 +56,6 @@ function getAuthHeader(username, password) {
 }
 
 // ============================================================
-// WEBDAV
-// ============================================================
-
-const PROPFIND_XML = `<?xml version="1.0" encoding="utf-8" ?>
-<d:propfind xmlns:d="DAV:">
-  <d:prop>
-    <d:displayname/>
-    <d:resourcetype/>
-  </d:prop>
-</d:propfind>`;
-
-let FILE_CACHE = [];
-let isScanning = false;
-
-// ============================================================
 // NORMALIZE TEXT
 // ============================================================
 
@@ -59,7 +66,7 @@ function normalizeText(text) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
-    .replace(/[._\-()[\]{}'":,!?+]/g, " ")
+    .replace(/[._()[\]{}'"!?,:+\-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -73,45 +80,52 @@ function compactText(text) {
 }
 
 // ============================================================
-// TOKENIZE
-// ============================================================
-
-function getWords(text) {
-  return normalizeText(text)
-    .split(" ")
-    .filter(word => word.length >= 2);
-}
-
-// ============================================================
 // EXTRACT SEASON / EPISODE
 // ============================================================
 
 function extractSeasonEpisode(text) {
   if (!text) return null;
 
-  const patterns = [
-    /\bS(\d{1,2})E(\d{1,3})\b/i,
-    /\bS(\d{1,2})[\s._-]+E(\d{1,3})\b/i,
-    /\bSeason[\s._-]*(\d{1,2})[\s._-]*Episode[\s._-]*(\d{1,3})\b/i
-  ];
+  let match = text.match(
+    /\bS(\d{1,2})E(\d{1,3})\b/i
+  );
 
-  for (const regex of patterns) {
-    const match = regex.exec(text);
-
-    if (match) {
-      return {
-        season: parseInt(match[1], 10),
-        episode: parseInt(match[2], 10)
-      };
-    }
+  if (match) {
+    return {
+      season: parseInt(match[1], 10),
+      episode: parseInt(match[2], 10)
+    };
   }
 
-  const seasonOnly =
-    /\bS(\d{1,2})\b/i.exec(text);
+  match = text.match(
+    /\bS(\d{1,2})[\s._-]+E(\d{1,3})\b/i
+  );
 
-  if (seasonOnly) {
+  if (match) {
     return {
-      season: parseInt(seasonOnly[1], 10),
+      season: parseInt(match[1], 10),
+      episode: parseInt(match[2], 10)
+    };
+  }
+
+  match = text.match(
+    /\bSeason[\s._-]*(\d{1,2})[\s._-]*Episode[\s._-]*(\d{1,3})\b/i
+  );
+
+  if (match) {
+    return {
+      season: parseInt(match[1], 10),
+      episode: parseInt(match[2], 10)
+    };
+  }
+
+  match = text.match(
+    /\bS(\d{1,2})\b/i
+  );
+
+  if (match) {
+    return {
+      season: parseInt(match[1], 10),
       episode: null
     };
   }
@@ -120,7 +134,7 @@ function extractSeasonEpisode(text) {
 }
 
 // ============================================================
-// CLEAN TITLE
+// CLEAN RELEASE NAME
 // ============================================================
 
 function cleanTitle(text) {
@@ -134,36 +148,144 @@ function cleanTitle(text) {
     ""
   );
 
-  // Season / episode
+  // Season / Episode
   value = value.replace(
-    /\bS\d{1,2}(?:E\d{1,3})?\b/gi,
+    /\bS\d{1,2}E\d{1,3}\b/gi,
     " "
   );
 
-  // Season xx
+  value = value.replace(
+    /\bS\d{1,2}\b/gi,
+    " "
+  );
+
+  // Season 1 / Season 2...
   value = value.replace(
     /\bSeason[\s._-]*\d{1,2}\b/gi,
     " "
   );
 
-  // Quality / release information
+  // Quality
   value = value.replace(
-    /\b(?:2160p|1080p|720p|480p|4k|uhd)\b/gi,
+    /\b2160p\b/gi,
     " "
   );
 
   value = value.replace(
-    /\b(?:web-dl|webdl|webrip|web|bluray|blu-ray|brrip|br-rip|hdtv|remux)\b/gi,
+    /\b1080p\b/gi,
     " "
   );
 
   value = value.replace(
-    /\b(?:x264|x265|h264|h265|hevc|avc|10bit|8bit)\b/gi,
+    /\b720p\b/gi,
     " "
   );
 
   value = value.replace(
-    /\b(?:aac|ac3|ddp|dd5\.1|dts|atmos)\b/gi,
+    /\b480p\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\b4K\b/gi,
+    " "
+  );
+
+  // Release types
+  value = value.replace(
+    /\bWEB[- ]?DL\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bWEB[- ]?RIP\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bBlu[- ]?Ray\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bBRRip\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bRemux\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bHDTV\b/gi,
+    " "
+  );
+
+  // Video codecs
+  value = value.replace(
+    /\bH\.?264\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bH\.?265\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bX264\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bX265\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bHEVC\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bAVC\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\b10bit\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\b8bit\b/gi,
+    " "
+  );
+
+  // Audio
+  value = value.replace(
+    /\bAAC\d?(?:\.\d+)?\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bDDP\d?(?:\.\d+)?\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bDD\d?(?:\.\d+)?\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bDTS(?:[- ]?HD)?\b/gi,
+    " "
+  );
+
+  value = value.replace(
+    /\bAtmos\b/gi,
     " "
   );
 
@@ -179,22 +301,22 @@ function cleanTitle(text) {
 // ============================================================
 // TITLE MATCH
 //
-// Đây là phần QUAN TRỌNG NHẤT.
-//
-// Không chỉ dựa vào S01E03.
-// Tên phim phải match trước.
+// Tên phim là điều kiện bắt buộc.
+// Không bao giờ match chỉ dựa vào S01E03.
 // ============================================================
 
-function titleMatches(fileText, requestedTitle) {
-  const requested = cleanTitle(requestedTitle);
-
-  if (!requested) {
+function titleMatches(searchText, requestedTitle) {
+  if (!searchText || !requestedTitle) {
     return false;
   }
 
-  const file = cleanTitle(fileText);
+  const requested =
+    cleanTitle(requestedTitle);
 
-  if (!file) {
+  const file =
+    cleanTitle(searchText);
+
+  if (!requested || !file) {
     return false;
   }
 
@@ -205,11 +327,14 @@ function titleMatches(fileText, requestedTitle) {
     compactText(file);
 
   // Exact
-  if (fileCompact === requestedCompact) {
+  if (
+    requestedCompact ===
+    fileCompact
+  ) {
     return true;
   }
 
-  // Toàn bộ title xuất hiện trong file
+  // Full title contained in filename/path
   if (
     requestedCompact.length >= 4 &&
     fileCompact.includes(requestedCompact)
@@ -217,8 +342,12 @@ function titleMatches(fileText, requestedTitle) {
     return true;
   }
 
-  // Kiểm tra từng từ quan trọng
-  const words = getWords(requested);
+  // Word based matching
+  const words =
+    requested.split(" ")
+      .filter(
+        word => word.length >= 2
+      );
 
   if (!words.length) {
     return false;
@@ -232,56 +361,24 @@ function titleMatches(fileText, requestedTitle) {
     }
   }
 
-  /*
-   * Với title nhiều từ:
-   * phải match phần lớn các từ.
-   *
-   * Ví dụ:
-   * "My Youth"
-   *
-   * My     -> có
-   * Youth  -> có
-   *
-   * => 2/2 => OK
-   *
-   * "House of the Dragon"
-   *
-   * My     -> không
-   * Youth  -> không
-   *
-   * => loại.
-   */
-
-  const ratio =
-    matched / words.length;
-
   if (words.length === 1) {
     return matched === 1;
   }
+
+  const ratio =
+    matched / words.length;
 
   return ratio >= 0.75;
 }
 
 // ============================================================
-// FIND MOVIE
+// MOVIE SEARCH
 // ============================================================
 
 function findMovieFiles(title) {
-  if (!title) {
-    return [];
-  }
-
   const results = [];
 
   for (const file of FILE_CACHE) {
-    /*
-     * Movie vẫn dùng title matching.
-     *
-     * Kiểm tra cả title và path để hỗ trợ:
-     *
-     * /Avatar (2009)/Avatar.2009.mkv
-     */
-
     const searchText =
       `${file.title} ${file.path}`;
 
@@ -299,7 +396,7 @@ function findMovieFiles(title) {
 }
 
 // ============================================================
-// FIND SERIES / EPISODE
+// SERIES SEARCH
 // ============================================================
 
 function findSeriesFiles(
@@ -307,40 +404,17 @@ function findSeriesFiles(
   season,
   episode
 ) {
-  if (!title) {
-    return [];
-  }
-
   const results = [];
 
   for (const file of FILE_CACHE) {
 
-    /*
-     * ========================================================
-     * BƯỚC 1
-     *
-     * TÊN PHIM PHẢI KHỚP.
-     *
-     * Đây là điều kiện bắt buộc.
-     *
-     * Nếu title không match:
-     *
-     * return / continue
-     *
-     * ngay lập tức.
-     *
-     * Vì vậy:
-     *
-     * My Youth
-     * +
-     * House of the Dragon S01E03
-     *
-     * sẽ bị loại ở đây.
-     * ========================================================
-     */
-
     const searchText =
       `${file.title} ${file.path}`;
+
+    // ========================================================
+    // STEP 1:
+    // TÊN PHIM PHẢI KHỚP
+    // ========================================================
 
     if (
       !titleMatches(
@@ -351,44 +425,28 @@ function findSeriesFiles(
       continue;
     }
 
-    /*
-     * ========================================================
-     * BƯỚC 2
-     *
-     * Kiểm tra Season / Episode
-     * ========================================================
-     */
+    // ========================================================
+    // STEP 2:
+    // SEASON / EPISODE
+    // ========================================================
 
     const se =
       extractSeasonEpisode(
         searchText
       );
 
-    /*
-     * Nếu request có Season
-     * thì file phải đúng Season.
-     */
-
     if (season != null) {
 
       if (!se) {
-        /*
-         * Không nhận diện được season.
-         *
-         * Không trả file mơ hồ.
-         */
         continue;
       }
 
-      if (se.season !== season) {
+      if (
+        se.season !== season
+      ) {
         continue;
       }
     }
-
-    /*
-     * Nếu request có Episode
-     * thì file phải có đúng Episode.
-     */
 
     if (episode != null) {
 
@@ -396,14 +454,12 @@ function findSeriesFiles(
         continue;
       }
 
-      if (se.episode !== episode) {
+      if (
+        se.episode !== episode
+      ) {
         continue;
       }
     }
-
-    /*
-     * Tới đây mới được coi là MATCH.
-     */
 
     results.push(file);
   }
@@ -420,8 +476,11 @@ async function scanAllFiles(path = "/") {
 
     let cleanPath = path;
 
-    if (!cleanPath.startsWith("/")) {
-      cleanPath = "/" + cleanPath;
+    if (
+      !cleanPath.startsWith("/")
+    ) {
+      cleanPath =
+        "/" + cleanPath;
     }
 
     if (
@@ -480,7 +539,8 @@ async function scanAllFiles(path = "/") {
           rawXml
         );
     } catch {
-      xmlText = rawXml;
+      xmlText =
+        rawXml;
     }
 
     const responseRegex =
@@ -490,7 +550,9 @@ async function scanAllFiles(path = "/") {
 
     while (
       (match =
-        responseRegex.exec(xmlText)) !== null
+        responseRegex.exec(
+          xmlText
+        )) !== null
     ) {
 
       const responseBody =
@@ -563,12 +625,15 @@ async function scanAllFiles(path = "/") {
           subPath
             .split("/")
             .map(
-              (segment, index) =>
-                index === 0
-                  ? segment
-                  : encodeURIComponent(
-                      segment
-                    )
+              (segment, index) => {
+                if (index === 0) {
+                  return segment;
+                }
+
+                return encodeURIComponent(
+                  segment
+                );
+              }
             )
             .join("/");
 
@@ -677,7 +742,6 @@ async function getCinemetaMeta(
   type,
   imdbId
 ) {
-
   try {
 
     let metaType =
@@ -704,6 +768,7 @@ async function getCinemetaMeta(
       await fetch(url);
 
     if (!response.ok) {
+
       console.log(
         `⚠️ Cinemeta HTTP ${response.status}`
       );
@@ -715,8 +780,10 @@ async function getCinemetaMeta(
       await response.json();
 
     return (
-      data?.meta ||
-      null
+      data &&
+      data.meta
+        ? data.meta
+        : null
     );
 
   } catch (error) {
@@ -771,13 +838,11 @@ function parseStreamRequest(
   // ==========================================================
   // SERIES
   //
-  // Ví dụ:
+  // Hỗ trợ:
   //
-  // tt1234567:1:1
+  // tt1234567:1:3
   //
-  // IMDb: tt1234567
-  // Season: 1
-  // Episode: 1
+  // = IMDb + Season + Episode
   // ==========================================================
 
   const seriesMatch =
@@ -831,7 +896,7 @@ function buildPikPakUrl(
       ? filePath
       : "/" + filePath;
 
-  const encoded =
+  const encodedPath =
     cleanPath
       .split("/")
       .map(
@@ -852,7 +917,7 @@ function buildPikPakUrl(
     PIKPAK_CONFIG.baseUrl.replace(
       /\/$/,
       ""
-    ) + encoded
+    ) + encodedPath
   );
 }
 
@@ -881,12 +946,8 @@ function getSignedUrl(
         Accept: "*/*"
       };
 
-      /*
-       * Nếu client tua phim,
-       * chuyển Range sang PikPak.
-       */
-
       if (rangeHeader) {
+
         headers.Range =
           rangeHeader;
 
@@ -913,7 +974,7 @@ function getSignedUrl(
             );
 
             // =================================================
-            // 302 → SIGNED URL
+            // PIKPAK 302
             // =================================================
 
             if (
@@ -933,39 +994,39 @@ function getSignedUrl(
 
               } catch {}
 
+              response.resume();
+
               resolve(
                 signedUrl
               );
-
-              response.resume();
 
               return;
             }
 
             // =================================================
-            // 200
+            // PIKPAK 200
             // =================================================
 
             if (
               response.statusCode === 200
             ) {
 
+              response.resume();
+
               resolve(
                 targetUrl
               );
 
-              response.resume();
-
               return;
             }
+
+            response.resume();
 
             reject(
               new Error(
                 `PikPak HTTP ${response.statusCode}`
               )
             );
-
-            response.resume();
           }
         );
 
@@ -975,7 +1036,7 @@ function getSignedUrl(
 
           request.destroy(
             new Error(
-              "PikPak timeout"
+              "PikPak request timeout"
             )
           );
         }
@@ -983,7 +1044,9 @@ function getSignedUrl(
 
       request.on(
         "error",
-        reject
+        error => {
+          reject(error);
+        }
       );
     }
   );
@@ -1081,7 +1144,7 @@ const server =
       }
 
       // ========================================================
-      // HEALTH
+      // HEALTH CHECK
       // ========================================================
 
       if (
@@ -1096,14 +1159,14 @@ const server =
 
         res.end(
           "Nuvio PikPak Provider OK\n" +
-          `Files: ${FILE_CACHE.length}\n`
+          `Cached files: ${FILE_CACHE.length}\n`
         );
 
         return;
       }
 
       // ========================================================
-      // STREAM
+      // STREAM REQUEST
       // ========================================================
 
       if (
@@ -1125,7 +1188,7 @@ const server =
           "🔍 NUVIO STREAM REQUEST"
         );
         console.log(
-          `📌 URL: ${req.url}`
+          `📌 Request: ${req.url}`
         );
         console.log(
           "========================================================"
@@ -1139,7 +1202,7 @@ const server =
         if (!requestInfo) {
 
           console.log(
-            "❌ Không parse được request"
+            "❌ Không parse được stream request."
           );
 
           res.end(
@@ -1160,7 +1223,7 @@ const server =
         );
 
         if (
-          requestInfo.season != null
+          requestInfo.season !== null
         ) {
 
           console.log(
@@ -1169,7 +1232,7 @@ const server =
         }
 
         if (
-          requestInfo.episode != null
+          requestInfo.episode !== null
         ) {
 
           console.log(
@@ -1178,4 +1241,310 @@ const server =
         }
 
         // ======================================================
-        // CINEM 
+        // CINEMETA
+        // ======================================================
+
+        const meta =
+          await getCinemetaMeta(
+            requestInfo.type,
+            requestInfo.imdbId
+          );
+
+        const title =
+          meta &&
+          (
+            meta.name ||
+            meta.title
+          )
+            ? (
+                meta.name ||
+                meta.title
+              )
+            : "";
+
+        console.log(
+          `💬 Cinemeta title: "${title}"`
+        );
+
+        // ======================================================
+        // SEARCH
+        // ======================================================
+
+        let matchedFiles = [];
+
+        if (
+          requestInfo.type ===
+          "movie"
+        ) {
+
+          matchedFiles =
+            findMovieFiles(
+              title
+            );
+
+        } else {
+
+          matchedFiles =
+            findSeriesFiles(
+              title,
+              requestInfo.season,
+              requestInfo.episode
+            );
+        }
+
+        console.log(
+          `🎯 Matched files: ${matchedFiles.length}`
+        );
+
+        // ======================================================
+        // SHOW MATCHED FILES
+        // ======================================================
+
+        if (
+          matchedFiles.length > 0
+        ) {
+
+          matchedFiles
+            .slice(0, 20)
+            .forEach(
+              (file, index) => {
+
+                console.log(
+                  `${index + 1}. ${file.path}`
+                );
+              }
+            );
+
+        } else {
+
+          console.log(
+            "❌ Không tìm thấy file phù hợp."
+          );
+        }
+
+        // ======================================================
+        // BUILD STREAMS
+        // ======================================================
+
+        const streams =
+          matchedFiles.map(
+            file => {
+
+              return {
+                name:
+                  "⚡ PikPak",
+
+                title:
+                  file.title,
+
+                url:
+                  `http://${host}` +
+                  `/pikpak?path=` +
+                  encodeURIComponent(
+                    file.path
+                  ),
+
+                behaviorHints: {
+                  notWebReady:
+                    false,
+
+                  bingeGroup:
+                    requestInfo.imdbId
+                }
+              };
+            }
+          );
+
+        console.log(
+          `✅ Trả ${streams.length} stream cho Nuvio.`
+        );
+
+        console.log(
+          "========================================================"
+        );
+
+        res.end(
+          JSON.stringify({
+            streams
+          })
+        );
+
+        return;
+      }
+
+      // ========================================================
+      // PIKPAK DIRECT REDIRECT
+      // ========================================================
+
+      if (
+        pathName ===
+        "/pikpak"
+      ) {
+
+        const targetPath =
+          parsedUrl.searchParams.get(
+            "path"
+          );
+
+        if (!targetPath) {
+
+          res.writeHead(
+            400
+          );
+
+          res.end(
+            "Missing path"
+          );
+
+          return;
+        }
+
+        let cleanPath;
+
+        try {
+
+          cleanPath =
+            decodeURIComponent(
+              targetPath
+            );
+
+        } catch {
+
+          cleanPath =
+            targetPath;
+        }
+
+        const targetUrl =
+          buildPikPakUrl(
+            cleanPath
+          );
+
+        console.log("");
+        console.log(
+          "========================================================"
+        );
+        console.log(
+          "🌊 PIKPAK DIRECT REDIRECT"
+        );
+        console.log(
+          `📁 ${cleanPath}`
+        );
+        console.log(
+          `🌐 ${targetUrl}`
+        );
+        console.log(
+          "========================================================"
+        );
+
+        const rangeHeader =
+          req.headers.range ||
+          null;
+
+        try {
+
+          const signedUrl =
+            await getSignedUrl(
+              targetUrl,
+              rangeHeader
+            );
+
+          console.log(
+            "✅ Đã lấy được signed download URL."
+          );
+
+          try {
+
+            console.log(
+              `➡️ Redirect Nuvio → ${new URL(signedUrl).hostname}`
+            );
+
+          } catch {}
+
+          res.writeHead(
+            302,
+            {
+              Location:
+                signedUrl,
+
+              "Cache-Control":
+                "no-store, no-cache, must-revalidate"
+            }
+          );
+
+          res.end();
+
+          return;
+
+        } catch (error) {
+
+          console.error(
+            `❌ Signed URL error: ${error.message}`
+          );
+
+          if (
+            !res.writableEnded
+          ) {
+
+            res.writeHead(
+              502
+            );
+
+            res.end(
+              "PikPak signed URL error"
+            );
+          }
+
+          return;
+        }
+      }
+
+      // ========================================================
+      // 404
+      // ========================================================
+
+      res.writeHead(
+        404
+      );
+
+      res.end(
+        "Not found"
+      );
+    }
+  );
+
+// ============================================================
+// START SERVER
+// ============================================================
+
+server.listen(
+  PORT,
+  "0.0.0.0",
+  () => {
+
+    console.log("");
+    console.log(
+      "========================================================"
+    );
+    console.log(
+      "🚀 NUVIO PIKPAK PROVIDER"
+    );
+    console.log(
+      `🌐 PORT: ${PORT}`
+    );
+    console.log(
+      "🎬 Movie + Series + Episode"
+    );
+    console.log(
+      "🔎 Strict title matching"
+    );
+    console.log(
+      "⚡ PikPak Signed URL Redirect"
+    );
+    console.log(
+      "========================================================"
+    );
+    console.log("");
+
+    refreshCache();
+  }
+);
