@@ -9,11 +9,11 @@ const PIKPAK_CONFIG = {
   baseUrl: "https://dav.mypikpak.com",
 
   // ==========================================================
-  // NHẬP TÀI KHOẢN PIKPAK CỦA BẠN TẠI ĐÂY
+  // TÀI KHOẢN WEBDAV PIKPAK
   // ==========================================================
 
   username: "nbmu",
-  password: " agwtnmaq"
+  password: "agwtnmaq"
 };
 
 // ============================================================
@@ -56,7 +56,7 @@ function getAuthHeader(username, password) {
 }
 
 // ============================================================
-// NORMALIZE TEXT
+// TEXT NORMALIZE
 // ============================================================
 
 function normalizeText(text) {
@@ -71,16 +71,12 @@ function normalizeText(text) {
     .trim();
 }
 
-// ============================================================
-// COMPACT TEXT
-// ============================================================
-
 function compactText(text) {
   return normalizeText(text).replace(/\s+/g, "");
 }
 
 // ============================================================
-// EXTRACT SEASON / EPISODE
+// SEASON / EPISODE
 // ============================================================
 
 function extractSeasonEpisode(text) {
@@ -134,7 +130,7 @@ function extractSeasonEpisode(text) {
 }
 
 // ============================================================
-// CLEAN RELEASE NAME
+// CLEAN RELEASE TITLE
 // ============================================================
 
 function cleanTitle(text) {
@@ -142,7 +138,6 @@ function cleanTitle(text) {
 
   let value = text;
 
-  // Extension
   value = value.replace(
     /\.(mkv|mp4|avi|mov|m3u8)$/i,
     ""
@@ -159,109 +154,35 @@ function cleanTitle(text) {
     " "
   );
 
-  // Season 1 / Season 2...
   value = value.replace(
     /\bSeason[\s._-]*\d{1,2}\b/gi,
     " "
   );
 
-  // Quality
-  value = value.replace(
-    /\b2160p\b/gi,
-    " "
-  );
+  // Resolution
+  value = value.replace(/\b2160p\b/gi, " ");
+  value = value.replace(/\b1080p\b/gi, " ");
+  value = value.replace(/\b720p\b/gi, " ");
+  value = value.replace(/\b480p\b/gi, " ");
+  value = value.replace(/\b4K\b/gi, " ");
 
-  value = value.replace(
-    /\b1080p\b/gi,
-    " "
-  );
+  // Release
+  value = value.replace(/\bWEB[- ]?DL\b/gi, " ");
+  value = value.replace(/\bWEB[- ]?RIP\b/gi, " ");
+  value = value.replace(/\bBlu[- ]?Ray\b/gi, " ");
+  value = value.replace(/\bBRRip\b/gi, " ");
+  value = value.replace(/\bRemux\b/gi, " ");
+  value = value.replace(/\bHDTV\b/gi, " ");
 
-  value = value.replace(
-    /\b720p\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\b480p\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\b4K\b/gi,
-    " "
-  );
-
-  // Release types
-  value = value.replace(
-    /\bWEB[- ]?DL\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\bWEB[- ]?RIP\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\bBlu[- ]?Ray\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\bBRRip\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\bRemux\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\bHDTV\b/gi,
-    " "
-  );
-
-  // Video codecs
-  value = value.replace(
-    /\bH\.?264\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\bH\.?265\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\bX264\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\bX265\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\bHEVC\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\bAVC\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\b10bit\b/gi,
-    " "
-  );
-
-  value = value.replace(
-    /\b8bit\b/gi,
-    " "
-  );
+  // Codec
+  value = value.replace(/\bH\.?264\b/gi, " ");
+  value = value.replace(/\bH\.?265\b/gi, " ");
+  value = value.replace(/\bX264\b/gi, " ");
+  value = value.replace(/\bX265\b/gi, " ");
+  value = value.replace(/\bHEVC\b/gi, " ");
+  value = value.replace(/\bAVC\b/gi, " ");
+  value = value.replace(/\b10bit\b/gi, " ");
+  value = value.replace(/\b8bit\b/gi, " ");
 
   // Audio
   value = value.replace(
@@ -301,8 +222,9 @@ function cleanTitle(text) {
 // ============================================================
 // TITLE MATCH
 //
-// Tên phim là điều kiện bắt buộc.
-// Không bao giờ match chỉ dựa vào S01E03.
+// QUAN TRỌNG:
+// Không match chỉ dựa vào S01E03.
+// Tên phim phải khớp trước.
 // ============================================================
 
 function titleMatches(searchText, requestedTitle) {
@@ -310,31 +232,22 @@ function titleMatches(searchText, requestedTitle) {
     return false;
   }
 
-  const requested =
-    cleanTitle(requestedTitle);
-
-  const file =
-    cleanTitle(searchText);
+  const requested = cleanTitle(requestedTitle);
+  const file = cleanTitle(searchText);
 
   if (!requested || !file) {
     return false;
   }
 
-  const requestedCompact =
-    compactText(requested);
-
-  const fileCompact =
-    compactText(file);
+  const requestedCompact = compactText(requested);
+  const fileCompact = compactText(file);
 
   // Exact
-  if (
-    requestedCompact ===
-    fileCompact
-  ) {
+  if (requestedCompact === fileCompact) {
     return true;
   }
 
-  // Full title contained in filename/path
+  // Full requested title nằm trong tên file
   if (
     requestedCompact.length >= 4 &&
     fileCompact.includes(requestedCompact)
@@ -342,12 +255,10 @@ function titleMatches(searchText, requestedTitle) {
     return true;
   }
 
-  // Word based matching
-  const words =
-    requested.split(" ")
-      .filter(
-        word => word.length >= 2
-      );
+  // Word matching
+  const words = requested
+    .split(" ")
+    .filter(word => word.length >= 2);
 
   if (!words.length) {
     return false;
@@ -365,10 +276,7 @@ function titleMatches(searchText, requestedTitle) {
     return matched === 1;
   }
 
-  const ratio =
-    matched / words.length;
-
-  return ratio >= 0.75;
+  return matched / words.length >= 0.75;
 }
 
 // ============================================================
@@ -411,10 +319,9 @@ function findSeriesFiles(
     const searchText =
       `${file.title} ${file.path}`;
 
-    // ========================================================
-    // STEP 1:
-    // TÊN PHIM PHẢI KHỚP
-    // ========================================================
+    // --------------------------------------------------------
+    // BƯỚC 1: TÊN PHIM PHẢI KHỚP
+    // --------------------------------------------------------
 
     if (
       !titleMatches(
@@ -425,38 +332,33 @@ function findSeriesFiles(
       continue;
     }
 
-    // ========================================================
-    // STEP 2:
-    // SEASON / EPISODE
-    // ========================================================
+    // --------------------------------------------------------
+    // BƯỚC 2: SEASON / EPISODE
+    // --------------------------------------------------------
 
     const se =
       extractSeasonEpisode(
         searchText
       );
 
-    if (season != null) {
+    if (season !== null) {
 
       if (!se) {
         continue;
       }
 
-      if (
-        se.season !== season
-      ) {
+      if (se.season !== season) {
         continue;
       }
     }
 
-    if (episode != null) {
+    if (episode !== null) {
 
       if (!se) {
         continue;
       }
 
-      if (
-        se.episode !== episode
-      ) {
+      if (se.episode !== episode) {
         continue;
       }
     }
@@ -472,15 +374,13 @@ function findSeriesFiles(
 // ============================================================
 
 async function scanAllFiles(path = "/") {
+
   try {
 
     let cleanPath = path;
 
-    if (
-      !cleanPath.startsWith("/")
-    ) {
-      cleanPath =
-        "/" + cleanPath;
+    if (!cleanPath.startsWith("/")) {
+      cleanPath = "/" + cleanPath;
     }
 
     if (
@@ -519,6 +419,19 @@ async function scanAllFiles(path = "/") {
         }
       );
 
+    // --------------------------------------------------------
+    // AUTH ERROR
+    // --------------------------------------------------------
+
+    if (response.status === 401) {
+
+      console.error(
+        "❌ PIKPAK HTTP 401 - Username/password WebDAV không đúng."
+      );
+
+      return;
+    }
+
     if (!response.ok) {
 
       console.error(
@@ -539,8 +452,7 @@ async function scanAllFiles(path = "/") {
           rawXml
         );
     } catch {
-      xmlText =
-        rawXml;
+      xmlText = rawXml;
     }
 
     const responseRegex =
@@ -576,6 +488,10 @@ async function scanAllFiles(path = "/") {
           );
       } catch {}
 
+      // ------------------------------------------------------
+      // SKIP CURRENT DIRECTORY
+      // ------------------------------------------------------
+
       const currentPath =
         decodeURIComponent(
           cleanPath
@@ -583,21 +499,20 @@ async function scanAllFiles(path = "/") {
 
       if (
         itemPath === currentPath ||
-        itemPath ===
-          currentPath + "/" ||
+        itemPath === currentPath + "/" ||
         itemPath === cleanPath
       ) {
         continue;
       }
 
+      // ------------------------------------------------------
+      // FOLDER
+      // ------------------------------------------------------
+
       const isFolder =
         responseBody.includes(
           "collection"
         );
-
-      // ======================================================
-      // FOLDER
-      // ======================================================
 
       if (isFolder) {
 
@@ -626,6 +541,7 @@ async function scanAllFiles(path = "/") {
             .split("/")
             .map(
               (segment, index) => {
+
                 if (index === 0) {
                   return segment;
                 }
@@ -644,9 +560,9 @@ async function scanAllFiles(path = "/") {
         continue;
       }
 
-      // ======================================================
-      // VIDEO FILE
-      // ======================================================
+      // ------------------------------------------------------
+      // VIDEO
+      // ------------------------------------------------------
 
       if (
         /\.(mp4|mkv|avi|mov|m3u8)$/i.test(
@@ -742,6 +658,7 @@ async function getCinemetaMeta(
   type,
   imdbId
 ) {
+
   try {
 
     let metaType =
@@ -821,9 +738,9 @@ function parseStreamRequest(
       match[2]
     );
 
-  // ==========================================================
+  // ----------------------------------------------------------
   // MOVIE
-  // ==========================================================
+  // ----------------------------------------------------------
 
   if (type === "movie") {
 
@@ -835,15 +752,13 @@ function parseStreamRequest(
     };
   }
 
-  // ==========================================================
+  // ----------------------------------------------------------
   // SERIES
   //
   // Hỗ trợ:
   //
   // tt1234567:1:3
-  //
-  // = IMDb + Season + Episode
-  // ==========================================================
+  // ----------------------------------------------------------
 
   const seriesMatch =
     /^(tt\d+)(?::(\d+))?(?::(\d+))?$/i
@@ -973,9 +888,9 @@ function getSignedUrl(
               `⬅️ PIKPAK HTTP ${response.statusCode}`
             );
 
-            // =================================================
-            // PIKPAK 302
-            // =================================================
+            // --------------------------------------------------
+            // 302 SIGNED URL
+            // --------------------------------------------------
 
             if (
               response.statusCode >= 300 &&
@@ -1003,9 +918,9 @@ function getSignedUrl(
               return;
             }
 
-            // =================================================
-            // PIKPAK 200
-            // =================================================
+            // --------------------------------------------------
+            // 200
+            // --------------------------------------------------
 
             if (
               response.statusCode === 200
@@ -1144,7 +1059,7 @@ const server =
       }
 
       // ========================================================
-      // HEALTH CHECK
+      // HEALTH
       // ========================================================
 
       if (
@@ -1166,7 +1081,7 @@ const server =
       }
 
       // ========================================================
-      // STREAM REQUEST
+      // STREAM
       // ========================================================
 
       if (
@@ -1297,7 +1212,7 @@ const server =
         );
 
         // ======================================================
-        // SHOW MATCHED FILES
+        // SHOW MATCHES
         // ======================================================
 
         if (
@@ -1547,4 +1462,4 @@ server.listen(
 
     refreshCache();
   }
-);
+); 
