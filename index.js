@@ -15,8 +15,8 @@ const https = require("https");
 
 const WEBDAV_CONFIG = {
   baseUrl: "https://dav.mypikpak.com",
-  username: "YOUR_PIKPAK_USERNAME",
-  password: "YOUR_PIKPAK_PASSWORD"
+  username: "nbmu",
+  password: "agwtnmaq"
 };
 
 // ============================================================
